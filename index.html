@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multiple Access Simulator (TDMA • FDMA • CDMA)</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#111833;
+      --panel-2:#0f1530;
+      --text:#e8ecff;
+      --muted:#a9b1d6;
+      --accent:#7c9cff;
+      --good:#2ecc71;
+      --warn:#f1c40f;
+      --bad:#e74c3c;
+      --purple:#9b59b6;
+      --green:#27ae60;
+      --blue:#2980b9;
+      --teal:#16a085;
+      --pink:#e84393;
+      --orange:#e67e22;
+    }
+    *{box-sizing: border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 10% 0%, #121a3c 0%, #0a0e1f 60%, #060912 100%);
+      color:var(--text);
+    }
+    .wrap{max-width:1100px;margin:24px auto;padding:16px}
+    .title{font-size:28px;font-weight:800;letter-spacing:.2px;margin-bottom:8px}
+    .subtitle{color:var(--muted);margin-bottom:24px}
+    .panel{
+      background:linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:20px;
+      padding:18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .controls{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:12px;
+      align-items:end;
+    }
+    .field{grid-column: span 4}
+    .field label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px 4px}
+    input[type=number], select{
+      width:100%;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.08);
+      outline:none;
+      background:#0e1430;
+      color:var(--text);
+      font-size:14px;
+      transition:.2s border-color;
+    }
+    input[type=number]:focus, select:focus{border-color:var(--accent)}
+    .btn{
+      grid-column: span 4;
+      padding:12px 16px;
+      border-radius:12px;
+      border:0;
+      color:#0b1020;
+      background:linear-gradient(135deg, #9fb5ff, #7c9cff 60%);
+      font-weight:700;
+      letter-spacing:.3px;
+      box-shadow: 0 10px 18px rgba(124,156,255,.28);
+      cursor:pointer;
+    }
+    .row{display:grid;grid-template-columns:1.2fr 2fr;gap:16px;margin-top:16px}
+    .viz, .explain{min-height:360px}
+    .viz{
+      border-radius:18px;
+      background: rgba(255,255,255,.03);
+      border:1px dashed rgba(255,255,255,.08);
+      padding:12px;
+      position:relative;
+      overflow:hidden;
+    }
+    .legend{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px 0}
+    .pill{
+      display:flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;
+      background:rgba(255,255,255,.06);font-size:12px;color:var(--muted);
+      border:1px solid rgba(255,255,255,.08)
+    }
+    .dot{width:12px;height:12px;border-radius:50%}
+    .explain{padding:12px}
+    .explain h3{margin:6px 0 6px 0}
+    .explain p{color:var(--muted);line-height:1.6}
+    /* TDMA timeline */
+    .timeline{
+      position:absolute;left:12px;right:12px;top:54px;height:56px;
+      display:grid;gap:6px;
+      grid-auto-flow:column;
+    }
+    .slot{
+      border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:12px;
+      border:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg, rgba(124,156,255,.2), rgba(124,156,255,.08));
+      color:#dfe6ff;
+      position:relative;
+      overflow:hidden;
+    }
+    .slot .shine{
+      position:absolute;left:-40%;top:0;bottom:0;width:40%;
+      background:linear-gradient(90deg, rgba(255,255,255,.0), rgba(255,255,255,.25), rgba(255,255,255,.0));
+      transform:skewX(-20deg);
+      animation: sweep 2.4s linear infinite;
+      opacity:.6;
+    }
+    @keyframes sweep { 0%{ left:-40% } 100%{ left:110% } }
+    .cursor{
+      position:absolute;top:30px;height:16px;width:3px;background:#fff;border-radius:2px;
+      box-shadow:0 0 12px rgba(255,255,255,.7);
+      transition:left .4s;
+    }
+    /* FDMA bands */
+    .bands{position:absolute;left:12px;right:12px;top:54px;bottom:12px;display:grid;gap:8px}
+    .band{
+      border-radius:10px;display:flex;align-items:center;justify-content:space-between;
+      padding:0 12px;font-size:12px;color:#eaf2ff;
+      border:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg, rgba(46,204,113,.22), rgba(46,204,113,.07));
+      position:relative;overflow:hidden;
+    }
+    .wave{
+      position:absolute;left:0;right:0;top:0;bottom:0;opacity:.3;pointer-events:none;
+      background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.25) 0 2px, transparent 2px 10px);
+      animation: scroll 3s linear infinite;
+    }
+    @keyframes scroll { from{ background-position:0 0 } to{ background-position:200px 0 } }
+    /* CDMA chips lane */
+    .lane{
+      position:absolute;left:12px;right:12px;height:42px;border-radius:10px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+    .chip{
+      position:absolute;top:8px;height:26px;min-width:74px;
+      display:flex;align-items:center;justify-content:center;
+      padding:0 10px;border-radius:999px;font-size:12px;color:#fff;
+      box-shadow:0 4px 12px rgba(0,0,0,.25);
+      animation: fly 6s linear infinite;
+    }
+    @keyframes fly { from{ transform: translateX(-120px)} to{ transform: translateX(1100px)} }
+    .foot{
+      margin-top:18px;font-size:12px;color:var(--muted);
+    }
+    .footer-note{opacity:.8}
+    .btn-ghost{
+      padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);
+      background:transparent;color:var(--text);cursor:pointer
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">Multiple Access Simulator</div>
+    <div class="subtitle">Interactive visualizer to teach <b>TDMA</b>, <b>FDMA</b>, and <b>CDMA</b>. Enter users, pick a technique, and press <i>Show Working</i>.</div>
+
+    <div class="panel">
+      <div class="controls">
+        <div class="field" style="grid-column: span 3">
+          <label>Number of Users</label>
+          <input id="users" type="number" min="1" max="20" value="4"/>
+        </div>
+        <div class="field" style="grid-column: span 5">
+          <label>Technique</label>
+          <select id="tech">
+            <option value="TDMA" selected>TDMA — Time Division Multiple Access</option>
+            <option value="FDMA">FDMA — Frequency Division Multiple Access</option>
+            <option value="CDMA">CDMA — Code Division Multiple Access</option>
+          </select>
+        </div>
+        <button class="btn" id="run">Show Working</button>
+        <button class="btn-ghost" id="pause">Pause/Play</button>
+      </div>
+
+      <div class="row">
+        <div class="viz" id="viz">
+          <!-- dynamic viz here -->
+        </div>
+        <div class="explain">
+          <div class="legend" id="legend"></div>
+          <h3 id="title">TDMA Working</h3>
+          <p id="desc">
+            In TDMA, users share the same frequency but take turns in different <b>time slots</b>. Only one user transmits per slot. The cursor below sweeps through time; each highlighted block represents a user's slot.
+          </p>
+          <ul id="bullets">
+            <li>Bandwidth: shared.</li>
+            <li>Time: divided into slots per frame.</li>
+            <li>Good for: bursty traffic, scheduled access.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="foot">
+        Teacher tip: Ask students which technique best fits <i>voice calls</i> vs <i>bursty IoT sensors</i>, and why.
+        <div class="footer-note">Made to work fully in the browser—no backend required.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const colors = [
+      'linear-gradient(135deg,#7c9cff,#9fb5ff)',
+      'linear-gradient(135deg,#27ae60,#2ecc71)',
+      'linear-gradient(135deg,#2980b9,#6fb1fc)',
+      'linear-gradient(135deg,#9b59b6,#c39bd3)',
+      'linear-gradient(135deg,#e67e22,#f1c40f)',
+      'linear-gradient(135deg,#16a085,#48c9b0)',
+      'linear-gradient(135deg,#e84393,#fd79a8)',
+      'linear-gradient(135deg,#8e44ad,#a29bfe)',
+      'linear-gradient(135deg,#2c3e50,#3498db)',
+      'linear-gradient(135deg,#d35400,#e67e22)',
+      'linear-gradient(135deg,#c0392b,#e74c3c)',
+      'linear-gradient(135deg,#1abc9c,#2ecc71)',
+      'linear-gradient(135deg,#34495e,#95a5a6)',
+    ];
+
+    const usersEl = document.getElementById('users');
+    const techEl = document.getElementById('tech');
+    const runBtn = document.getElementById('run');
+    const pauseBtn = document.getElementById('pause');
+    const viz = document.getElementById('viz');
+    const legend = document.getElementById('legend');
+    const title = document.getElementById('title');
+    const desc = document.getElementById('desc');
+    const bullets = document.getElementById('bullets');
+
+    let paused = false;
+    pauseBtn.addEventListener('click', ()=>{
+      paused = !paused;
+      const anims = document.getAnimations ? document.getAnimations() : [];
+      for (const a of anims){ paused ? a.pause() : a.play(); }
+    });
+
+    function makeLegend(n){
+      legend.innerHTML = '';
+      for(let i=0;i<n;i++){
+        const p = document.createElement('div');
+        p.className = 'pill';
+        const d = document.createElement('div');
+        d.className = 'dot';
+        d.style.background = `conic-gradient(from 0deg, rgba(255,255,255,.0), rgba(255,255,255,.0)), ${colors[i%colors.length]}`;
+        p.appendChild(d);
+        const txt = document.createElement('span');
+        txt.textContent = `User ${i+1}`;
+        p.appendChild(txt);
+        legend.appendChild(p);
+      }
+    }
+
+    function explain(type){
+      if(type==='TDMA'){
+        title.textContent = 'TDMA Working';
+        desc.innerHTML = 'In TDMA, users share the same frequency but take turns in different <b>time slots</b>. Only one user transmits per slot. The moving cursor sweeps through time; each highlighted block is a user’s slot.';
+        bullets.innerHTML = '<li>Bandwidth: shared single carrier</li><li>Time: partitioned into slots per frame</li><li>Pros: simple scheduling; predictable latency</li><li>Cons: idle slots waste capacity if users are silent</li>';
+      } else if(type==='FDMA'){
+        title.textContent = 'FDMA Working';
+        desc.innerHTML = 'In FDMA, users transmit <b>at the same time</b> but on different <b>frequency bands</b>. Each band is isolated from the others via filtering.';
+        bullets.innerHTML = '<li>Bandwidth: divided into sub-bands (with guard bands)</li><li>Time: continuous</li><li>Pros: simple receivers; simultaneous users</li><li>Cons: fixed allocation can be inefficient</li>';
+      } else {
+        title.textContent = 'CDMA Working';
+        desc.innerHTML = 'In CDMA, all users share time and frequency but use distinct <b>codes</b> to spread their signals. A matched filter recovers the intended user and treats others as noise.';
+        bullets.innerHTML = '<li>Bandwidth: shared wideband</li><li>Time: simultaneous</li><li>Pros: soft capacity; robust to interference</li><li>Cons: near–far problem; code management</li>';
+      }
+    }
+
+    function renderTDMA(n){
+      viz.innerHTML = '';
+      const top = document.createElement('div');
+      top.style.position='absolute';
+      top.style.left='12px'; top.style.right='12px';
+      top.style.top='12px'; top.style.display='flex'; top.style.justifyContent='space-between';
+      top.style.fontSize='12px'; top.style.color='var(--muted)';
+      top.innerHTML = '<div>Frame 1</div><div>Time →</div>';
+      viz.appendChild(top);
+
+      const tl = document.createElement('div');
+      tl.className = 'timeline';
+      tl.style.gridTemplateColumns = `repeat(${n}, minmax(0,1fr))`;
+      viz.appendChild(tl);
+
+      for(let i=0;i<n;i++){
+        const s = document.createElement('div');
+        s.className = 'slot';
+        s.style.background = `linear-gradient(180deg, rgba(124,156,255,.2), rgba(124,156,255,.08)), ${colors[i%colors.length]}`;
+        s.style.color = '#0b1020';
+        s.innerHTML = `<div class="shine"></div>User ${i+1}`;
+        tl.appendChild(s);
+      }
+
+      const cursor = document.createElement('div');
+      cursor.className = 'cursor';
+      viz.appendChild(cursor);
+
+      // animate cursor across slots
+      let idx = -1;
+      function tick(){
+        if(paused) return;
+        idx = (idx+1)%n;
+        const slotWidth = tl.clientWidth / n;
+        cursor.style.left = (12 + idx*slotWidth + slotWidth/2) + 'px';
+      }
+      tick();
+      setInterval(tick, 900);
+    }
+
+    function renderFDMA(n){
+      viz.innerHTML = '';
+      const top = document.createElement('div');
+      top.style.position='absolute';
+      top.style.left='12px'; top.style.right='12px';
+      top.style.top='12px'; top.style.display='flex'; top.style.justifyContent='space-between';
+      top.style.fontSize='12px'; top.style.color='var(--muted)';
+      top.innerHTML = '<div>Spectrum</div><div>Frequency ↑</div>';
+      viz.appendChild(top);
+
+      const bands = document.createElement('div');
+      bands.className = 'bands';
+      bands.style.gridTemplateRows = `repeat(${n}, minmax(0,1fr))`;
+      viz.appendChild(bands);
+
+      for(let i=0;i<n;i++){
+        const b = document.createElement('div');
+        b.className = 'band';
+        b.style.background = `linear-gradient(180deg, rgba(46,204,113,.22), rgba(46,204,113,.07)), ${colors[i%colors.length]}`;
+        b.innerHTML = `<span>User ${i+1}</span><span>Band ${i+1}</span>`;
+        const w = document.createElement('div'); w.className='wave';
+        b.appendChild(w);
+        bands.appendChild(b);
+      }
+    }
+
+    function renderCDMA(n){
+      viz.innerHTML = '';
+      const top = document.createElement('div');
+      top.style.position='absolute';
+      top.style.left='12px'; top.style.right='12px';
+      top.style.top='12px'; top.style.display='flex'; top.style.justifyContent='space-between';
+      top.style.fontSize='12px'; top.style.color='var(--muted)';
+      top.innerHTML = '<div>Shared Channel</div><div>Time →</div>';
+      viz.appendChild(top);
+
+      const lane = document.createElement('div');
+      lane.className = 'lane';
+      lane.style.top = '54px'; lane.style.bottom = '54px';
+      viz.appendChild(lane);
+
+      // place chips with different code labels; they all fly together
+      for(let i=0;i<n;i++){
+        for(let k=0;k<3;k++){
+          const c = document.createElement('div');
+          c.className = 'chip';
+          c.style.top = (10 + (k*32)) + 'px';
+          c.style.background = colors[i%colors.length];
+          c.style.animationDelay = (Math.random()*-6).toFixed(2)+'s';
+          c.textContent = `U${i+1} • Code${i+1}`;
+          lane.appendChild(c);
+        }
+      }
+
+      // receiver filter box
+      const rx = document.createElement('div');
+      rx.style.position='absolute'; rx.style.right='18px'; rx.style.bottom='12px';
+      rx.style.padding='10px 12px'; rx.style.border='1px solid rgba(255,255,255,.12)';
+      rx.style.borderRadius='12px'; rx.style.background='rgba(255,255,255,.03)';
+      rx.style.fontSize='12px'; rx.innerHTML = '<b>Receiver</b><br/>Matched to Code 1 → recovers User 1';
+      viz.appendChild(rx);
+    }
+
+    function run(){
+      const n = Math.max(1, Math.min(20, parseInt(usersEl.value || '1', 10)));
+      usersEl.value = n;
+      const type = techEl.value;
+      makeLegend(n);
+      explain(type);
+      if(type==='TDMA') renderTDMA(n);
+      else if(type==='FDMA') renderFDMA(n);
+      else renderCDMA(n);
+    }
+
+    runBtn.addEventListener('click', run);
+    // initial render
+    run();
+    window.addEventListener('resize', ()=>{
+      // re-run to reposition TDMA cursor
+      if(techEl.value==='TDMA') run();
+    });
+  </script>
+</body>
+</html>
